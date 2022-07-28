@@ -6,10 +6,20 @@
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "file-saver": "2.0.5",
+    "json-loader": "^0.5.7",
+    "jszip": "3.5.0",
+    "prop-types": "15.7.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "react-excel-renderer": "^1.1.0",
+    "react-export-excel": "0.5.3",
+    "react-scripts": "3.4.3",
+    "web-vitals": "^2.1.4",
+    "webpack": "^4.42.0",
+    "xlsx": "0.16.9",
+    "xlsx-populate": "1.21.0",
+    "xlsx-style": "0.8.13"
   },
   "scripts": {
     "start": "react-scripts start",
