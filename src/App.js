@@ -37,15 +37,34 @@ function App() {
     let parentPropertyFirstLevel = "";
     let parentPropertySecondLevel = "";
     console.log(rows)
-    headerDoc && setHeaderInfo([rows[0], rows[1], rows[2]])
-    rows.forEach(values => {
+    //
+    let rowsByFormat = docformat == "csv" ? rows.map(values => [...values[0].replace(/[\",]/g, "").split(/\u0000/)]) : rows
+    console.log(rowsByFormat)
+    console.log("docformat: ", docformat)
+    headerDoc && setHeaderInfo(
+      docformat == "csv" ? [
+        rowsByFormat[1].filter(v => v !== '' && v !== '\"'), 
+        rowsByFormat[0].filter(v => v !== '' && v !== '\"'), 
+        rowsByFormat[2].filter(v => v !== '' && v !== '\"')
+      ]
+      : [
+      rowsByFormat[1],
+      rowsByFormat[0],
+      rowsByFormat[2],
+    ]
+      )
+    rowsByFormat.forEach(values => {
       values.forEach(value => {
-        if (typeof value == "string") {
+        if (typeof value == "string" && value !== "") {
           let textSplit = value.split("      ")
-          if (!isNaN(textSplit[0])) {
+          if (!isNaN(textSplit[0]) && textSplit[0] != "0.00" ) {
             let dataObjectSheet = textSplit[0].at(0) > 3 ? "eri" : "esf"
             console.log("textSplit[0]: ", textSplit[0], textSplit[0].at(0))
             console.log("dataObjectSheet: ", dataObjectSheet, dataObject[dataObjectSheet])
+            console.log(value)
+            let saldoInicialPositionByIndex = docformat === "csv" 
+            ?  parseInt(values.length.toString().at(-1))+1
+            : 6
             switch (textSplit[0].length) {
               case 1:
                 parentPropertyFirstLevel = textSplit[1]
@@ -65,11 +84,15 @@ function App() {
               
               case 4:
                 let arrayTextSplit = [textSplit[0], labelsByCuenta[textSplit[0]] || textSplit[1]].join("      ");
+                console.log("saldoInicialPositionByIndex0: ", textSplit[0] === "1345" ? saldoInicialPositionByIndex :"")
+                console.log("saldoInicialPositionByIndex1: ", textSplit[0] === "1345" ? Math.abs(parseFloat(rowsByFormat.find(v => !isEmpty({children: v[0]}) && v[0].split("      ")[0] === "13459590").at(saldoInicialPositionByIndex))) :"")
+                console.log("saldoInicialPositionByIndex2: ", textSplit[0] === "1345" ? Math.abs(parseFloat(values.at(saldoInicialPositionByIndex))) :"")
                 let arrayValues = textSplit[0].at(0) > 3 
+
                 //values para ERI
                 ? [
                   arrayTextSplit, 
-                  (Math.abs(parseFloat(values.at(-1))) - Math.abs(parseFloat(values[0]))).toString(),
+                  (+Math.abs(parseFloat(values.at(-1))) - Math.abs(parseFloat(values[saldoInicialPositionByIndex]))).toString(),
                   "0",
                   values.at(-1).toString()
                 ]
@@ -77,11 +100,11 @@ function App() {
                 : [
                   arrayTextSplit, 
                   textSplit[0] === "1345" 
-                    ? (Math.abs(parseFloat(rows.find(v => !isEmpty({children: v[0]}) && !isNaN(v[0].split("      ")[0]) && v[0].split("      ")[0] === "13459590")[values.length-1])) - Math.abs(parseFloat(values[values.length-1]))).toString()
-                    : values[values.length-1].toString(), 
+                    ? (Math.abs(parseFloat(rowsByFormat.find(v => !isEmpty({children: v[0]}) && v[0].split("      ")[0] === "13459590").at(-1))) - Math.abs(parseFloat(values.at(-1)))).toString()
+                    : values.at(-1).toString(), 
                   textSplit[0] === "1345" 
-                    ?  (Math.abs(parseFloat(rows.find(v => !isEmpty({children: v[0]}) && !isNaN(v[0].split("      ")[0]) && v[0].split("      ")[0] === "13459590")[6])) - Math.abs(parseFloat(values[6]))).toString()
-                    : values[6].toString(), 
+                    ?  (Math.abs(parseFloat(rowsByFormat.find(v => !isEmpty({children: v[0]}) && v[0].split("      ")[0] === "13459590").at(saldoInicialPositionByIndex))) - Math.abs(parseFloat(values.at(saldoInicialPositionByIndex)))).toString()
+                    : values[saldoInicialPositionByIndex].toString(), 
                   
                 ]
                 dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel].push(arrayValues)
@@ -93,7 +116,7 @@ function App() {
                   textSplit[0].slice(0,4) === "1110" ||
                   textSplit[0].slice(0,4) === "1120"
                   ) {
-                  let arrayValues = [textSplit.join("      "), values[6].toString(), values[values.length-1].toString()]
+                  let arrayValues = [textSplit.join("      "), values[saldoInicialPositionByIndex].toString(), values[values.length-1].toString()]
                   dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel].push(arrayValues)
                 }
                 break;
@@ -153,10 +176,19 @@ function App() {
           Math.abs(parseFloat(prev[1]) + parseFloat(v[1])).toString(),
           Math.abs(parseFloat(prev[2]) + parseFloat(v[2])).toString(),
           Math.abs(parseFloat(prev[3]) + parseFloat(v[3])).toString(),
-          !isEsf ? Math.abs(parseFloat(prev[4]) + parseFloat(v[4])).toString() : "",
+          !isEsf ? Math.abs(parseFloat(prev[4]) + parseFloat(v[4])).toString() : " ",
         ]);
       newData[keys[i]].total = [allTotalValuesFiltered];
     });
+    //generamos total de PASIVO + PATRIMONIO
+    if (Object.keys(newData).includes("PASIVO") && Object.keys(newData).includes("PATRIMONIO")) {
+      newData["PATRIMONIO"].total.push([
+        "TOTAL PASIVO MAS PATRIMONIO",
+        (Math.abs(parseFloat(newData["PASIVO"].total[0][1])) + Math.abs(parseFloat(newData["PATRIMONIO"].total[0][1]))).toString(),
+        (Math.abs(parseFloat(newData["PASIVO"].total[0][1])) + Math.abs(parseFloat(newData["PATRIMONIO"].total[0][1]))).toString(),
+        (Math.abs(parseFloat(newData["PASIVO"].total[0][1])) + Math.abs(parseFloat(newData["PATRIMONIO"].total[0][1]))).toString(),
+      ])
+    }
     console.log("newData: ", newData);
 
     return newData
@@ -166,7 +198,11 @@ function App() {
     console.log(v)
     console.log(typeof v[0])
     return v.map((data, i) => ({
-      value: data.split("      ").at(-1),
+      value: data != "0" 
+      ? !isNaN(data.split("      ").at(-1)) && Math.sign(parseFloat(data.split("      ").at(-1))) == -1
+        ?  `(${Math.abs(data.split("      ").at(-1))})` 
+        :  data.split("      ").at(-1)
+      : "-",
       style:
         typeof v[0] !== 'undefined' && v[0].includes("TOTAL") && isNaN(data)
           ? { font: titleFontStyles }
@@ -191,7 +227,7 @@ function App() {
       console.log("title: ", Object.keys(newData)[i]);
       let titleSection = [
         {
-          value: Object.keys(newData)[i],
+          value: Object.keys(newData)[i] ,
           style: { font: titleFontStyles },
         },
         " ",
@@ -202,7 +238,7 @@ function App() {
         console.log("data: ", data);
         return [
           {
-            value: data,
+            value: data !== "total" ? data : " ",
             style: isNaN(data)
               ? { font: { ...basicFontStyles, bold: true } }
               : { ...basicNumberStyle },
@@ -215,7 +251,8 @@ function App() {
       console.log(titles);
       let mapDataFormatted = values.map((value) => {
         return value.map((v) => {
-          console.log("v[0]: ", v[0]);
+          console.log("pop V:",v)
+          v.at(-1) === " " && v.pop();
           return formatDataToCell(v)
         });
       });
@@ -254,25 +291,26 @@ function App() {
   const centerAlignment = {
     vertical: "center",
     horizontal: "center",
-    wrapText: true,
+    wrapText: false,
   };
 
   const rightAlignment = {
     vertical: "right",
     horizontal: "right",
-    wrapText: true,
+    wrapText: false,
   };
 
   const basicNumberStyle = {
-    font: { ...basicFontStyles, numFmt: "0.00%" },
+    font: { ...basicFontStyles },
+    numFmt: "$#,###.00",
     alignment: rightAlignment,
   };
 
   const titleNumberStyle = {
     font: {
       ...titleFontStyles,
-      numFmt: "0.00%",
     },
+    numFmt: "$#,###.00",
     alignment: rightAlignment,
     border: { top: { style: "thin", color: { rgb: "000000" } } },
   };
@@ -280,8 +318,8 @@ function App() {
   const totalNumberStyle = {
     font: {
       ...titleFontStyles,
-      numFmt: "0.00%",
     },
+    numFmt: "$#,###.00",
     alignment: rightAlignment,
     border: {
       top: { style: "thin", color: { rgb: "000000" } },
@@ -289,9 +327,12 @@ function App() {
     },
   };
 
+  const [docformat, setDocformat] = useState(null)
+
   const fileHandler = (event) => {
     let fileObj = event.target.files[0];
     console.log(event.target.files[0]);
+    setDocformat(event.target.files[0].name.split(".").at(-1))
     //just pass the fileObj as parameter
     ExcelRenderer(fileObj, (err, resp) => {
       if (err) {
