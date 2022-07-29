@@ -43,13 +43,13 @@ function App() {
     console.log("docformat: ", docformat)
     headerDoc && setHeaderInfo(
       docformat == "csv" ? [
-        rowsByFormat[1].filter(v => v !== '' && v !== '\"'), 
         rowsByFormat[0].filter(v => v !== '' && v !== '\"'), 
+        rowsByFormat[1].filter(v => v !== '' && v !== '\"'), 
         rowsByFormat[2].filter(v => v !== '' && v !== '\"')
       ]
       : [
-      rowsByFormat[1],
-      rowsByFormat[0],
+        rowsByFormat[0],
+        rowsByFormat[1],
       rowsByFormat[2],
     ]
       )
