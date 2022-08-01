@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ExcelFile from "react-export-excel/dist/ExcelPlugin/components/ExcelFile";
 import ExcelColumn from "react-export-excel/dist/ExcelPlugin/elements/ExcelColumn";
 import ExcelSheet from "react-export-excel/dist/ExcelPlugin/elements/ExcelSheet";
@@ -16,6 +16,7 @@ function App() {
   
   const [cols, setCols] = useState([]);
   const [rows, setRows] = useState([]);
+  const [rowsEriPrevMonth, setRowsEriPrevMonth] = useState([]);
 
   const [headerInfo, setHeaderInfo] = useState(null);
   const [footerInfo, setFooterInfo] = useState([
@@ -25,6 +26,24 @@ function App() {
 
   const labelsByCuenta = {
     "4170": "Cuotas de Administración"
+  }
+
+  const getERISecondColumnFromTwoFiles = (dataObject, dataObject2) => {
+    let newDataObject = dataObject;
+    for (const key in newDataObject.eri) {
+        if (typeof newDataObject.eri[key] === "object") {
+          for (const k in newDataObject.eri[key]) {
+            dataObject2.eri[key][k].forEach((v,i) => {
+              let previousMonthValue = v[1];
+              newDataObject.eri[key][k][i].splice(2, 1, previousMonthValue)
+            })
+            //reemplazamos el 0 de la segunda columna, por el valor de la primera columna del reporte del mes anterior
+          }
+        }
+    }
+    console.log("newDataObjectFromTWOFiles: ", newDataObject);
+    return newDataObject;
+
   }
 
   const getExcelDataAndFormat = (rows, headerDoc = true) => {
@@ -126,11 +145,8 @@ function App() {
         }
       })
     })
-    console.log("dataObject: ", dataObject)
-    console.log("dataESF: ", dataObject.esf)
-    console.log("dataERI: ", dataObject.eri)
-    setDataESF(dataObject.esf);
-    setDataERI(dataObject.eri);
+    return dataObject
+    
   }
 
   const getVariationsAndTotalsESF = (data, isEsf = true) => {
@@ -329,30 +345,42 @@ function App() {
 
   const [docformat, setDocformat] = useState(null)
 
-  const fileHandler = (event) => {
-    let fileObj = event.target.files[0];
-    console.log(event.target.files[0]);
-    setDocformat(event.target.files[0].name.split(".").at(-1))
-    //just pass the fileObj as parameter
-    ExcelRenderer(fileObj, (err, resp) => {
-      if (err) {
-        console.log(err);
-      } else {
-        setCols(resp.cols);
-        setRows(resp.rows);
-      }
-    });
-  };
+  const fileHandler = useCallback(
+    (event, setState = setRows) => {
+      let fileObj = event.target.files[0];
+      console.log(event.target.files[0]);
+      setDocformat(event.target.files[0].name.split(".").at(-1))
+      //just pass the fileObj as parameter
+      ExcelRenderer(fileObj, (err, resp) => {
+        if (err) {
+          console.log(err);
+        } else {
+          setCols(resp.cols);
+          setState(resp.rows);
+        }
+      });
+    }
+  )
+   
 
   useEffect(() => {
-    if (rows !== null && rows.length > 0) {
-      getExcelDataAndFormat(rows);
+    if (rows !== null && rows.length > 0 &&
+      rowsEriPrevMonth !== null && rowsEriPrevMonth.length > 0
+      ) {
+      const dataObject = getExcelDataAndFormat(rows);
+      const dataObjectPrevMonth = getExcelDataAndFormat(rowsEriPrevMonth);
+      const newDataObject = getERISecondColumnFromTwoFiles(dataObject, dataObjectPrevMonth);
+      setDataERI(newDataObject.eri)
+      setDataESF(newDataObject.esf)
     }
-  }, [rows])
+  }, [rows, rowsEriPrevMonth])
+
+  
 
   useEffect(() => {
     if (dataESF !== null && 
-      dataERI !== null) {
+      dataERI !== null
+      ) {
       let newDataESF = getVariationsAndTotalsESF(dataESF);
       let newDataERI = getVariationsAndTotalsESF(dataERI, false);
       setDataESF(newDataESF)
@@ -380,24 +408,23 @@ function App() {
       ])
     }
   }, [dataESF, dataERI]);
+
+  {console.log("dataFormattedESF: ", dataFormattedESF)}
+  {console.log("dataFormattedERI: ", dataFormattedERI)}
   
 
   return (
     <div className="App">
-      <div>
-        <input type="file" onChange={fileHandler} style={{ padding: "10px" }} />
-        {/* <div>
-          <OutTable
-            data={rows}
-            columns={cols}
-            tableClassName="ExcelTable2007"
-            tableHeaderRowClass="heading"
-          />
-        </div> */}
-      </div>
-
-      {console.log("dataFormattedESF: ", dataFormattedESF)}
-      {dataFormattedESF !== null && (
+      {
+        (dataFormattedESF === null || dataFormattedERI === null) ? <>
+        <div>
+        <input type="file" onChange={(e) => fileHandler(e, setRows)} style={{ padding: "10px" }} />
+        {
+           rows && setRowsEriPrevMonth && fileHandler && rows.length > 0 ? <input type="file" onChange={(e) => fileHandler(e, setRowsEriPrevMonth)} style={{ padding: "10px" }} /> : <></>
+        }
+        </div>
+        </>
+        : <>
         <ExcelFile filename="Estados Financieros">
           <ExcelSheet
             dataSet={dataFormattedESF}
@@ -410,7 +437,13 @@ function App() {
           >
           </ExcelSheet>
         </ExcelFile>
-      )}
+        </>
+
+      }
+      
+
+
+
     </div>
   );
 }
