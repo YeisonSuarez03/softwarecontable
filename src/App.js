@@ -76,7 +76,10 @@ function App() {
       values.forEach(value => {
         if (typeof value == "string" && value !== "") {
           let textSplit = value.split("      ")
-          if (!isNaN(textSplit[0]) && textSplit[0] != "0.00" ) {
+          if (!isNaN(textSplit[0]) && 
+            textSplit[0] != "0.00" && 
+            typeof textSplit[1] === "string" && 
+            textSplit[1] !== "" ) {
             let dataObjectSheet = textSplit[0].at(0) > 3 ? "eri" : "esf"
             console.log("textSplit[0]: ", textSplit[0], textSplit[0].at(0))
             console.log("dataObjectSheet: ", dataObjectSheet, dataObject[dataObjectSheet])
@@ -102,11 +105,12 @@ function App() {
                 break;
               
               case 4:
+              case 6:
                 let arrayTextSplit = [textSplit[0], labelsByCuenta[textSplit[0]] || textSplit[1]].join("      ");
                 console.log("saldoInicialPositionByIndex0: ", textSplit[0] === "1345" ? saldoInicialPositionByIndex :"")
                 console.log("saldoInicialPositionByIndex1: ", textSplit[0] === "1345" ? Math.abs(parseFloat(rowsByFormat.find(v => !isEmpty({children: v[0]}) && v[0].split("      ")[0] === "13459590").at(saldoInicialPositionByIndex))) :"")
                 console.log("saldoInicialPositionByIndex2: ", textSplit[0] === "1345" ? Math.abs(parseFloat(values.at(saldoInicialPositionByIndex))) :"")
-                let arrayValues = textSplit[0].at(0) > 3 
+                let arrayValues = dataObjectSheet === "eri"
 
                 //values para ERI
                 ? [
@@ -118,15 +122,44 @@ function App() {
                 //values para ESF
                 : [
                   arrayTextSplit, 
-                  textSplit[0] === "1345" 
+                  /* textSplit[0] === "1345" 
                     ? (Math.abs(parseFloat(rowsByFormat.find(v => !isEmpty({children: v[0]}) && v[0].split("      ")[0] === "13459590").at(-1))) - Math.abs(parseFloat(values.at(-1)))).toString()
-                    : values.at(-1).toString(), 
-                  textSplit[0] === "1345" 
+                    :  */values.at(-1).toString(), 
+                  /* textSplit[0] === "1345" 
                     ?  (Math.abs(parseFloat(rowsByFormat.find(v => !isEmpty({children: v[0]}) && v[0].split("      ")[0] === "13459590").at(saldoInicialPositionByIndex))) - Math.abs(parseFloat(values.at(saldoInicialPositionByIndex)))).toString()
-                    : values[saldoInicialPositionByIndex].toString(), 
+                    :  */values[saldoInicialPositionByIndex].toString(), 
                   
-                ]
-                dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel].push(arrayValues)
+                ];
+
+                //CREAMOS REFERENCIA DE VARIABLE ARRAY QUE ALMACENA FILAS DE VALORES PARA USARLO EN CONDICIONALES
+                console.log("REVERSED VALUES: ", textSplit[0].length === 6 ? [...dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel]] : "")
+                let reversedValues = textSplit[0].length === 6 && [...dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel]];
+                let lastTotalValue = textSplit[0].length === 6 && {
+                  row: reversedValues.find(v => v[0].split("      ")[0].length === 4),
+                  index: reversedValues.findIndex(v => v[0].split("      ")[0].length === 4)
+                }
+                console.log("ROW FIND: ", textSplit[0].length === 6 && lastTotalValue?.row)
+                console.log("ROW VALUES: ", textSplit[0].length === 6 && arrayValues)
+                console.log("INDEX FIND: ", textSplit[0].length === 6 && lastTotalValue?.index)
+
+                if (
+                  textSplit[0].length === 6 &&
+                  lastTotalValue?.index !== -1 &&
+                  (
+                    parseFloat(arrayValues[1]) === parseFloat(lastTotalValue?.row[1]) &&
+                    parseFloat(arrayValues[2]) === parseFloat(lastTotalValue?.row[2])
+                  )
+                  ) {
+                    arrayValues[0] = textSplit[0] + "      " + "dt" + "      " + textSplit[1]
+                    dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel].splice(lastTotalValue?.index, 1, arrayValues)
+                } else {
+                  if (
+                    // textSplit[0].length === 6 &&
+                    (arrayValues[1] === "0.00" &&
+                    arrayValues[2] === "0.00" )
+                  ) return;
+                  dataObject[dataObjectSheet][parentPropertyFirstLevel][parentPropertySecondLevel].push(arrayValues)
+                }
 
                 break;
             
@@ -167,12 +200,12 @@ function App() {
           console.log(parseFloat(value[i][1]));
           console.log(parseFloat(value[i][2]));
           console.log("value: ",value[i][0])
-          let splitCode = value[i][0].split("      ")[0]
-          total1 += splitCode.length === 4 ? parseFloat(value[i][1]) : 0;
-          total2 += splitCode.length === 4 ? parseFloat(value[i][2]) : 0;
-          total4 += !isEsf && splitCode.length === 4 ? parseFloat(value[i][3]) : 0;
+          let splitCode = value[i][0].split("      ")
+          total1 += (splitCode[0].length === 4 || splitCode.at(-2) === "dt") ? parseFloat(value[i][1]) : 0;
+          total2 += (splitCode[0].length === 4 || splitCode.at(-2) === "dt") ? parseFloat(value[i][2]) : 0;
+          total4 += !isEsf && (splitCode[0].length === 4 || splitCode.at(-2) === "dt") ? parseFloat(value[i][3]) : 0;
           isEsf ? value[i].push(variationValue) : value[i].splice(3,0,variationValue); 
-          splitCode.length === 4 && total3Values.push(parseFloat(variationValue));
+          (splitCode[0].length === 4 || splitCode[0].length === 6) && total3Values.push(parseFloat(variationValue));
         }
         let allTotalValues = [
           " ",
@@ -368,7 +401,7 @@ function App() {
       rowsEriPrevMonth !== null && rowsEriPrevMonth.length > 0
       ) {
       const dataObject = getExcelDataAndFormat(rows);
-      const dataObjectPrevMonth = getExcelDataAndFormat(rowsEriPrevMonth);
+      const dataObjectPrevMonth = getExcelDataAndFormat(rowsEriPrevMonth, false);
       const newDataObject = getERISecondColumnFromTwoFiles(dataObject, dataObjectPrevMonth);
       setDataERI(newDataObject.eri)
       setDataESF(newDataObject.esf)
